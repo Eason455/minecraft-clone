@@ -18,6 +18,7 @@ const ITEM_STONE_AXE = 104;
 const ITEM_WOOD_SWORD = 105;
 const ITEM_STONE_SWORD = 106;
 const ITEM_WOOD_SHOVEL = 107;
+const ITEM_STONE_SHOVEL = 108;
 const ITEM_COAL = BLOCK.COAL_ORE; // coal ore drops itself
 
 const RECIPES = [

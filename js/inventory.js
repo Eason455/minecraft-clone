@@ -164,14 +164,15 @@ class Inventory {
 
   // Virtual item textures (not blocks)
   _virtualItemTextures = {
-    99: 'planks',    // stick → looks like wood
-    101: 'planks',   // wood pickaxe
+    99: 'planks',      // stick
+    101: 'planks',     // wood pickaxe
     102: 'cobblestone', // stone pickaxe
-    103: 'planks',   // wood axe
+    103: 'planks',     // wood axe
     104: 'cobblestone', // stone axe
-    105: 'planks',   // wood sword
+    105: 'planks',     // wood sword
     106: 'cobblestone', // stone sword
-    107: 'cobblestone', // stone shovel
+    107: 'planks',     // wood shovel
+    108: 'cobblestone', // stone shovel
   };
 
   _virtualItemNames = {
@@ -182,7 +183,8 @@ class Inventory {
     104: 'Stone Axe',
     105: 'Wooden Sword',
     106: 'Stone Sword',
-    107: 'Stone Shovel',
+    107: 'Wooden Shovel',
+    108: 'Stone Shovel',
   };
 
   // Get texture for an item
