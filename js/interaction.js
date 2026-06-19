@@ -144,10 +144,10 @@ class InteractionManager {
   }
 
   _placeBlock(hit) {
-    const { position, normal, blockId } = hit;
+    const { position, normal, blockId: hitBlockId } = hit;
 
     // Check if right-clicking a crafting table — open 3x3 crafting
-    if (blockId === BLOCK.CRAFTING_TABLE) {
+    if (hitBlockId === BLOCK.CRAFTING_TABLE) {
       if (this._onOpenTable) this._onOpenTable();
       return;
     }
