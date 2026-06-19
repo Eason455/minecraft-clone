@@ -123,18 +123,25 @@ class InteractionManager {
     const wz = position.z;
 
     // Don't break bedrock in survival
-    if (blockId === BLOCK.BEDROCK) return;
+    if (blockId === BLOCK.BEDROCK && !window._isCreative) return;
 
     // Set to air
     this.chunkManager.setBlock(wx, wy, wz, BLOCK.AIR);
 
-    // Get drop
-    const dropId = BLOCK_DROPS[blockId] || blockId;
-    if (dropId !== BLOCK.AIR) {
-      this.inventory.addItem(dropId, 1);
+    // Particles
+    if (typeof spawnBlockParticles !== 'undefined') {
+      spawnBlockParticles(wx, wy, wz, blockId);
     }
 
-    // Check for nearby falling blocks (sand, gravel)
+    // Get drop (only in survival)
+    if (!window._isCreative) {
+      const dropId = BLOCK_DROPS[blockId] || blockId;
+      if (dropId !== BLOCK.AIR) {
+        this.inventory.addItem(dropId, 1);
+      }
+    }
+
+    // Check for nearby falling blocks
     if (typeof checkFallingAround !== 'undefined') {
       checkFallingAround(wx, wy, wz);
     }
@@ -146,9 +153,35 @@ class InteractionManager {
   _placeBlock(hit) {
     const { position, normal, blockId: hitBlockId } = hit;
 
-    // Check if right-clicking a crafting table — open 3x3 crafting
+    // Check if right-clicking a crafting table or furnace
     if (hitBlockId === BLOCK.CRAFTING_TABLE) {
       if (this._onOpenTable) this._onOpenTable();
+      return;
+    }
+    if (hitBlockId === BLOCK.FURNACE) {
+      // Simple furnace: smelt 1 coal ore + 1 raw material → result
+      const hasCoal = this.inventory.hasItems(BLOCK.COAL_ORE, 1);
+      const hasIron = this.inventory.hasItems(BLOCK.IRON_ORE, 1);
+      const hasGold = this.inventory.hasItems(BLOCK.GOLD_ORE, 1);
+      const hasSand = this.inventory.hasItems(BLOCK.SAND, 1);
+      if (hasCoal && hasIron) {
+        this.inventory.consumeItems(BLOCK.COAL_ORE, 1);
+        this.inventory.consumeItems(BLOCK.IRON_ORE, 1);
+        this.inventory.addItem(BLOCK.IRON_ORE, 1); // smelted iron = iron block for now
+        if (this._onMessage) this._onMessage('[OK] Smelted Iron Ore!');
+      } else if (hasCoal && hasGold) {
+        this.inventory.consumeItems(BLOCK.COAL_ORE, 1);
+        this.inventory.consumeItems(BLOCK.GOLD_ORE, 1);
+        this.inventory.addItem(BLOCK.GOLD_ORE, 2); // bonus gold
+        if (this._onMessage) this._onMessage('[OK] Smelted Gold Ore!');
+      } else if (hasCoal && hasSand) {
+        this.inventory.consumeItems(BLOCK.COAL_ORE, 1);
+        this.inventory.consumeItems(BLOCK.SAND, 1);
+        this.inventory.addItem(BLOCK.GLASS, 1);
+        if (this._onMessage) this._onMessage('[OK] Smelted Glass!');
+      } else {
+        if (this._onMessage) this._onMessage('[!] Furnace needs Coal + (Iron/Gold/Sand) in inventory');
+      }
       return;
     }
 
@@ -179,7 +212,9 @@ class InteractionManager {
     // Only place blocks (not items)
     if (PLANT_BLOCKS.has(blockId) || BLOCK_PROPS[blockId]) {
       this.chunkManager.setBlock(px, py, pz, blockId);
-      this.inventory.removeItem(this.player.selectedSlot, 1);
+      if (!window._isCreative) {
+        this.inventory.removeItem(this.player.selectedSlot, 1);
+      }
       this._remeshAffectedChunks(px, pz);
     }
   }

@@ -86,6 +86,25 @@ class Player {
   }
 
   _updateMovement(dt) {
+    // Creative mode flying
+    if (window._isCreative) {
+      const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)).normalize();
+      const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw)).normalize();
+      let mx = 0, my = 0, mz = 0;
+      if (input.isKeyDown('KeyW')) { mx += forward.x; mz += forward.z; }
+      if (input.isKeyDown('KeyS')) { mx -= forward.x; mz -= forward.z; }
+      if (input.isKeyDown('KeyA')) { mx -= right.x; mz -= right.z; }
+      if (input.isKeyDown('KeyD')) { mx += right.x; mz += right.z; }
+      if (input.isKeyDown('Space')) my += 1;
+      if (input.isKeyDown('ShiftLeft') || input.isKeyDown('ShiftRight')) my -= 1;
+      const flySpeed = 15;
+      const len = Math.sqrt(mx*mx+my*my+mz*mz);
+      if (len > 0) { mx /= len; my /= len; mz /= len; }
+      this.velocity.set(mx * flySpeed, my * flySpeed, mz * flySpeed);
+      this.onGround = false;
+      return;
+    }
+
     // Compute forward direction from yaw (bypass camera quaternion for frame-perfect input)
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)).normalize();
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw)).normalize();

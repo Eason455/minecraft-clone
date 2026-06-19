@@ -50,27 +50,75 @@ import { getTextureUV } from './textures.js';
 window.__getTextureUV = getTextureUV;
 console.log('[init] Texture atlas ready:', atlasCanvas.width, 'x', atlasCanvas.height);
 
+// ============ Particle System ============
+
+const particles = [];
+const particleGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+function spawnBlockParticles(wx, wy, wz, blockId) {
+  const colorMap = { [BLOCK.GRASS]: 0x7c9c4c, [BLOCK.DIRT]: 0x8b6914, [BLOCK.STONE]: 0x7f7f7f,
+    [BLOCK.SAND]: 0xdbd08e, [BLOCK.COBBLESTONE]: 0x6b6b6b, [BLOCK.WOOD_PLANKS]: 0xb8945c };
+  const color = new THREE.Color(colorMap[blockId] || 0x808080);
+  for (let i = 0; i < 6; i++) {
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 });
+    const p = new THREE.Mesh(particleGeo, mat);
+    p.position.set(wx + 0.3 + Math.random() * 0.4, wy + 0.3 + Math.random() * 0.4, wz + 0.3 + Math.random() * 0.4);
+    p.userData = { vx: (Math.random() - 0.5) * 3, vy: Math.random() * 4 + 2, vz: (Math.random() - 0.5) * 3, life: 0.5 + Math.random() * 0.5 };
+    scene.add(p); particles.push(p);
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.userData.life -= dt;
+    if (p.userData.life <= 0) { scene.remove(p); p.material.dispose(); particles.splice(i, 1); continue; }
+    p.userData.vy -= 9.8 * dt;
+    p.position.x += p.userData.vx * dt; p.position.y += p.userData.vy * dt; p.position.z += p.userData.vz * dt;
+    p.material.opacity = p.userData.life;
+  }
+}
+
+// ============ Cloud System ============
+const clouds = [];
+function createClouds() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, roughness: 1 });
+  for (let i = 0; i < 30; i++) {
+    const geo = new THREE.BoxGeometry(4 + Math.random() * 12, 0.5, 2 + Math.random() * 6);
+    const c = new THREE.Mesh(geo, mat); c.position.set((Math.random() - 0.5) * 200, 100 + Math.random() * 30, (Math.random() - 0.5) * 200);
+    c.userData = { speed: 1 + Math.random() * 3 }; scene.add(c); clouds.push(c);
+  }
+}
+function updateClouds(dt) {
+  for (const c of clouds) { c.position.x += c.userData.speed * dt; if (c.position.x > 150) c.position.x = -150; }
+}
+
+// ============ Torch Lights ============
+const torchLights = [];
+function updateTorchLights(px, py, pz) {
+  for (const tl of torchLights) scene.remove(tl);
+  torchLights.length = 0;
+  let count = 0;
+  for (let dx = -14; dx <= 14 && count < 6; dx++)
+    for (let dy = -6; dy <= 6 && count < 6; dy++)
+      for (let dz = -14; dz <= 14 && count < 6; dz++)
+        if (chunkManager.getBlock(Math.floor(px) + dx, Math.floor(py) + dy, Math.floor(pz) + dz) === BLOCK.TORCH) {
+          const l = new THREE.PointLight(0xffaa33, 1.8, 9); l.position.set(Math.floor(px) + dx + 0.5, Math.floor(py) + dy + 0.5, Math.floor(pz) + dz + 0.5);
+          scene.add(l); torchLights.push(l); count++;
+        }
+}
+
+// ============ Creative Mode ============
+let isCreative = false;
+window._isCreative = false;
+function toggleCreative() {
+  isCreative = !isCreative;
+  window._isCreative = isCreative;
+  player.isCreative = isCreative;
+  uiManager.showMessage(isCreative ? '[OK] Creative Mode — Fly: Space/Shift, Infinite blocks' : '[OK] Survival Mode');
+}
+
 // ============ Initialize Systems ============
 
 initWorld(Math.floor(Math.random() * 100000));
-
-// Add test cube to verify rendering works
-const testGeo = new THREE.BoxGeometry(2, 2, 2);
-const testMat = new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.5 });
-const testCube = new THREE.Mesh(testGeo, testMat);
-testCube.position.set(5, 70, 5);
-testCube.name = 'test-cube';
-scene.add(testCube);
-
-// Add a grid of colored cubes for visual debug
-for (let i = 0; i < 5; i++) {
-  const g = new THREE.BoxGeometry(1, 1, 1);
-  const m = new THREE.MeshStandardMaterial({ color: [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff][i], roughness: 0.5 });
-  const cube = new THREE.Mesh(g, m);
-  cube.position.set(3 + i * 2, 70, 3);
-  scene.add(cube);
-}
-console.log('[init] Test cubes added — you should see 6 colored cubes near spawn');
+createClouds();
 
 const inventory = new Inventory();
 const player = new Player(camera, chunkManager);
@@ -85,10 +133,9 @@ document.addEventListener('click', () => audio.init(), { once: true });
 // UI
 const uiManager = new UIManager(player, inventory, interaction);
 
-// Wire crafting table right-click
-interaction._onOpenTable = () => {
-  uiManager.openCraftingTable();
-};
+// Wire crafting table and furnace
+interaction._onOpenTable = () => { uiManager.openCraftingTable(); };
+interaction._onMessage = (msg) => { uiManager.showMessage(msg); };
 
 // Add highlight line to scene
 scene.add(interaction.getHighlightLine());
@@ -379,6 +426,11 @@ function gameLoop(timestamp) {
     console.log(`[debug] standingOn=${blockBelow} chunkLoaded=${chunkLoaded} onGround=${player.onGround} pos=(${player.position.x.toFixed(1)},${player.position.y.toFixed(1)},${player.position.z.toFixed(1)})`);
   }
 
+  // Creative mode toggle (G key)
+  if (input.isKeyPressed('KeyG')) {
+    toggleCreative();
+  }
+
   // Update interaction (block highlight, breaking, placing)
   if (gameRunning && !uiManager.inventory.isOpen) {
     interaction.update(deltaTime);
@@ -408,6 +460,13 @@ function gameLoop(timestamp) {
 
   // Update sky (day/night cycle)
   skyManager.update(deltaTime);
+
+  // Update particles, clouds, torch lights
+  updateParticles(deltaTime);
+  updateClouds(deltaTime);
+  if (Math.floor(timestamp / 500) !== Math.floor((timestamp - deltaTime * 1000) / 500)) {
+    updateTorchLights(player.position.x, player.position.y, player.position.z);
+  }
 
   // Update HUD
   uiManager.updateHUD();
