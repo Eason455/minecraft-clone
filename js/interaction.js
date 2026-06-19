@@ -134,12 +134,23 @@ class InteractionManager {
       this.inventory.addItem(dropId, 1);
     }
 
-    // Trigger re-mesh of affected chunks
+    // Check for nearby falling blocks (sand, gravel)
+    if (typeof checkFallingAround !== 'undefined') {
+      checkFallingAround(wx, wy, wz);
+    }
+
+    // Trigger re-mesh
     this._remeshAffectedChunks(wx, wz);
   }
 
   _placeBlock(hit) {
-    const { position, normal } = hit;
+    const { position, normal, blockId } = hit;
+
+    // Check if right-clicking a crafting table — open 3x3 crafting
+    if (blockId === BLOCK.CRAFTING_TABLE) {
+      if (this._onOpenTable) this._onOpenTable();
+      return;
+    }
 
     // Calculate place position (adjacent to hit face)
     const px = position.x + normal.x;

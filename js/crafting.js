@@ -7,108 +7,59 @@ import { BLOCK } from './constants.js';
 // Recipe format: { pattern: [string, string, (string)], result: { id, count }, shapeless: bool }
 // pattern uses single-character keys, key maps to block ID
 // For 2x2 recipes, pattern is 2 rows
+// For 3x3 recipes, pattern is 3 rows
+
+// Item IDs (virtual, not blocks)
+const ITEM_STICK = 99;
+const ITEM_WOOD_PICKAXE = 101;
+const ITEM_STONE_PICKAXE = 102;
+const ITEM_WOOD_AXE = 103;
+const ITEM_STONE_AXE = 104;
+const ITEM_WOOD_SWORD = 105;
+const ITEM_STONE_SWORD = 106;
+const ITEM_WOOD_SHOVEL = 107;
+const ITEM_COAL = BLOCK.COAL_ORE; // coal ore drops itself
 
 const RECIPES = [
-  // === Wood processing ===
-  {
-    pattern: ['L'],
-    key: { L: BLOCK.OAK_LOG },
-    result: { id: BLOCK.WOOD_PLANKS, count: 4 },
-    shapeless: true,
-  },
-  {
-    pattern: ['L'],
-    key: { L: BLOCK.BIRCH_LOG },
-    result: { id: BLOCK.WOOD_PLANKS, count: 4 },
-    shapeless: true,
-  },
-  {
-    pattern: ['P', 'P'],
-    key: { P: BLOCK.WOOD_PLANKS },
-    result: { id: BLOCK.OAK_LOG, count: 4 }, // sticks from planks
-    shapeless: true,
-    overrideResult: { id: BLOCK.OAK_LOG, count: 4 }, // Actually should be sticks but we'll use as placeholder
-  },
+  // === Log → Planks (shapeless, 1 log → 4 planks) ===
+  { pattern: ['L'], key: { L: BLOCK.OAK_LOG }, result: { id: BLOCK.WOOD_PLANKS, count: 4 }, shapeless: true },
+  { pattern: ['L'], key: { L: BLOCK.BIRCH_LOG }, result: { id: BLOCK.WOOD_PLANKS, count: 4 }, shapeless: true },
 
-  // === Sticks ===
-  {
-    pattern: ['P', 'P'],
-    key: { P: BLOCK.WOOD_PLANKS },
-    result: { id: 100, count: 4 }, // Stick item (not a block)
-    shapeless: true,
-  },
+  // === Planks → Sticks (2 planks vertical → 4 sticks) ===
+  { pattern: ['P', 'P'], key: { P: BLOCK.WOOD_PLANKS }, result: { id: ITEM_STICK, count: 4 }, shapeless: true },
 
-  // === Crafting Table ===
-  {
-    pattern: ['PP', 'PP'],
-    key: { P: BLOCK.WOOD_PLANKS },
-    result: { id: BLOCK.CRAFTING_TABLE, count: 1 },
-    shapeless: false,
-  },
+  // === Crafting Table (2x2 of planks) ===
+  { pattern: ['PP', 'PP'], key: { P: BLOCK.WOOD_PLANKS }, result: { id: BLOCK.CRAFTING_TABLE, count: 1 }, shapeless: false },
 
-  // === Planks variants ===
-  {
-    pattern: ['C', 'C', 'C', 'C'],
-    key: { C: BLOCK.COBBLESTONE },
-    result: { id: BLOCK.STONE, count: 4 }, // stone bricks from cobble
-    shapeless: true,
-  },
+  // === Torches (coal + stick) ===
+  { pattern: ['C', 'S'], key: { C: ITEM_COAL, S: ITEM_STICK }, result: { id: BLOCK.TORCH, count: 4 }, shapeless: true },
 
-  // === Torches ===
-  {
-    pattern: ['C', 'S'],
-    key: { C: BLOCK.COAL_ORE, S: 100 }, // S = stick
-    result: { id: BLOCK.TORCH, count: 4 },
-    shapeless: true,
-  },
+  // === Furnace (3x3: 8 cobblestone ring) ===
+  { pattern: ['CCC', 'C C', 'CCC'], key: { C: BLOCK.COBBLESTONE }, result: { id: BLOCK.FURNACE, count: 1 }, shapeless: false },
 
-  // === Furnace ===
-  {
-    pattern: ['CCC', 'C C', 'CCC'],
-    key: { C: BLOCK.COBBLESTONE },
-    result: { id: BLOCK.FURNACE, count: 1 },
-    shapeless: false,
-  },
+  // === Sandstone (2x2 sand) ===
+  { pattern: ['SS', 'SS'], key: { S: BLOCK.SAND }, result: { id: BLOCK.SANDSTONE, count: 1 }, shapeless: false },
 
-  // === Stone tools ===
-  {
-    pattern: ['CCC', ' S ', ' S '],
-    key: { C: BLOCK.COBBLESTONE, S: 100 },
-    result: { id: BLOCK.COBBLESTONE, count: 1 }, // stone pick (represented as special)
-    shapeless: false,
-  },
+  // === Bricks (2x2 bricks) ===
+  { pattern: ['BB', 'BB'], key: { B: BLOCK.BRICK }, result: { id: BLOCK.BRICK, count: 1 }, shapeless: false },
 
-  // === Wood Planks 2x2 ===
-  {
-    pattern: ['P'],
-    key: { P: BLOCK.WOOD_PLANKS },
-    result: { id: BLOCK.OAK_LOG, count: 1 }, // placeholder
-    shapeless: true,
-  },
+  // === Wooden Pickaxe ===
+  { pattern: ['PPP', ' S ', ' S '], key: { P: BLOCK.WOOD_PLANKS, S: ITEM_STICK }, result: { id: ITEM_WOOD_PICKAXE, count: 1 }, shapeless: false },
 
-  // === Glass panes ===
-  {
-    pattern: ['G', 'G', 'G'],
-    key: { G: BLOCK.GLASS },
-    result: { id: BLOCK.GLASS, count: 3 }, // placeholder: glass pane
-    shapeless: true,
-  },
+  // === Stone Pickaxe ===
+  { pattern: ['CCC', ' S ', ' S '], key: { C: BLOCK.COBBLESTONE, S: ITEM_STICK }, result: { id: ITEM_STONE_PICKAXE, count: 1 }, shapeless: false },
 
-  // === Sandstone ===
-  {
-    pattern: ['SS', 'SS'],
-    key: { S: BLOCK.SAND },
-    result: { id: BLOCK.SANDSTONE, count: 1 },
-    shapeless: false,
-  },
+  // === Stone Axe ===
+  { pattern: ['CC', 'CS', ' S'], key: { C: BLOCK.COBBLESTONE, S: ITEM_STICK }, result: { id: ITEM_STONE_AXE, count: 1 }, shapeless: false },
 
-  // === Bricks ===
-  {
-    pattern: ['BB', 'BB'],
-    key: { B: BLOCK.BRICK },
-    result: { id: BLOCK.BRICK, count: 4 }, // brick block
-    shapeless: false,
-  },
+  // === Stone Sword ===
+  { pattern: ['C', 'C', 'S'], key: { C: BLOCK.COBBLESTONE, S: ITEM_STICK }, result: { id: ITEM_STONE_SWORD, count: 1 }, shapeless: false },
+
+  // === Stone Shovel ===
+  { pattern: ['C', 'S', 'S'], key: { C: BLOCK.COBBLESTONE, S: ITEM_STICK }, result: { id: ITEM_STONE_SHOVEL, count: 1 }, shapeless: false },
+
+  // === Planks 4x from 1 log (shapeless alt) ===
+  { pattern: ['P'], key: { P: BLOCK.WOOD_PLANKS }, result: { id: ITEM_STICK, count: 2 }, shapeless: true },
 ];
 
 // Match a crafting grid against recipes

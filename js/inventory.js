@@ -29,11 +29,13 @@ class Inventory {
   }
 
   _giveStarterItems() {
-    // Hotbar starter items
+    // Hotbar starter items for testing
     this.slots[0] = { id: BLOCK.OAK_LOG, count: 16 };
     this.slots[1] = { id: BLOCK.DIRT, count: 64 };
     this.slots[2] = { id: BLOCK.STONE, count: 64 };
     this.slots[3] = { id: BLOCK.COBBLESTONE, count: 32 };
+    this.slots[4] = { id: 99, count: 16 }; // sticks
+    this.slots[7] = { id: BLOCK.CRAFTING_TABLE, count: 1 };
     this.slots[8] = { id: BLOCK.TORCH, count: 16 };
   }
 
@@ -160,12 +162,46 @@ class Inventory {
     return BLOCK_NAMES[itemId] || 'Unknown';
   }
 
+  // Virtual item textures (not blocks)
+  _virtualItemTextures = {
+    99: 'planks',    // stick → looks like wood
+    101: 'planks',   // wood pickaxe
+    102: 'cobblestone', // stone pickaxe
+    103: 'planks',   // wood axe
+    104: 'cobblestone', // stone axe
+    105: 'planks',   // wood sword
+    106: 'cobblestone', // stone sword
+    107: 'cobblestone', // stone shovel
+  };
+
+  _virtualItemNames = {
+    99: 'Stick',
+    101: 'Wooden Pickaxe',
+    102: 'Stone Pickaxe',
+    103: 'Wooden Axe',
+    104: 'Stone Axe',
+    105: 'Wooden Sword',
+    106: 'Stone Sword',
+    107: 'Stone Shovel',
+  };
+
   // Get texture for an item
   getItemTexture(itemId) {
     const props = BLOCK_PROPS[itemId];
-    if (!props) return null;
-    const texName = props.topTex || props.sideTex || props.tex || 'stone';
-    return getTextureCanvas(texName);
+    if (props) {
+      const texName = props.topTex || props.sideTex || props.tex || 'stone';
+      return getTextureCanvas(texName);
+    }
+    // Try virtual item
+    const vTex = this._virtualItemTextures[itemId];
+    if (vTex) return getTextureCanvas(vTex);
+    return getTextureCanvas('stone');
+  }
+
+  // Get name
+  getItemName(itemId) {
+    if (this._virtualItemNames[itemId]) return this._virtualItemNames[itemId];
+    return BLOCK_NAMES[itemId] || 'Unknown';
   }
 }
 

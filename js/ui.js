@@ -254,6 +254,72 @@ class UIManager {
     // The crafting panel is built as part of the inventory overlay
   }
 
+  // ============ 3x3 Crafting Table ============
+
+  openCraftingTable() {
+    // Show inventory with 3x3 crafting mode
+    this.usingTable = true;
+    this.showInventory();
+    // Swap the 2x2 crafting grid label and grid to 3x3
+    const grid2x2 = document.getElementById('crafting-grid-2x2');
+    const label = grid2x2 ? grid2x2.previousElementSibling : null;
+    if (grid2x2) {
+      grid2x2.className = 'crafting-grid table';
+      grid2x2.innerHTML = '';
+      for (let i = 0; i < 9; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'crafting-slot';
+        slot.id = `craft-slot-${i}`;
+        slot.dataset.craftIndex = i;
+        slot.addEventListener('click', () => this._onTableSlotClick(i));
+        slot.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this._onTableSlotRightClick(i);
+        });
+        grid2x2.appendChild(slot);
+      }
+      if (label) label.textContent = 'Crafting Table';
+    }
+  }
+
+  _onTableSlotClick(index) {
+    const inv = this.inventory;
+    if (inv.cursorItem && inv.cursorItem.id !== BLOCK.AIR) {
+      if (inv.tableGrid[index].id === BLOCK.AIR) {
+        inv.tableGrid[index] = { id: inv.cursorItem.id, count: 1 };
+        inv.cursorItem.count--;
+        if (inv.cursorItem.count <= 0) inv.cursorItem = null;
+      }
+    } else if (inv.tableGrid[index].id !== BLOCK.AIR) {
+      inv.cursorItem = { ...inv.tableGrid[index] };
+      inv.tableGrid[index] = { id: BLOCK.AIR, count: 0 };
+    }
+    this.updateInventoryDisplay();
+  }
+
+  _onTableSlotRightClick(index) {
+    const inv = this.inventory;
+    if (inv.cursorItem && inv.cursorItem.id !== BLOCK.AIR) {
+      if (inv.tableGrid[index].id === BLOCK.AIR) {
+        inv.tableGrid[index] = { id: inv.cursorItem.id, count: 1 };
+        inv.cursorItem.count--;
+        if (inv.cursorItem.count <= 0) inv.cursorItem = null;
+      } else if (inv.tableGrid[index].id === inv.cursorItem.id) {
+        inv.tableGrid[index].count++;
+        inv.cursorItem.count--;
+        if (inv.cursorItem.count <= 0) inv.cursorItem = null;
+      }
+    } else if (inv.tableGrid[index].id !== BLOCK.AIR) {
+      const half = Math.ceil(inv.tableGrid[index].count / 2);
+      inv.cursorItem = { id: inv.tableGrid[index].id, count: half };
+      inv.tableGrid[index].count -= half;
+      if (inv.tableGrid[index].count <= 0) {
+        inv.tableGrid[index] = { id: BLOCK.AIR, count: 0 };
+      }
+    }
+    this.updateInventoryDisplay();
+  }
+
   // ============ Inventory interactions ============
 
   updateInventoryDisplay() {
@@ -289,8 +355,11 @@ class UIManager {
       }
     }
 
-    // Update crafting result
-    const result = findCraftingRecipe(inv.craftingGrid, 2, 2);
+    // Update crafting result (2x2 or 3x3 table)
+    const grid = this.usingTable ? inv.tableGrid : inv.craftingGrid;
+    const gridW = this.usingTable ? 3 : 2;
+    const gridH = this.usingTable ? 3 : 2;
+    const result = findCraftingRecipe(grid, gridW, gridH);
     const resultSlot = document.getElementById('crafting-result');
     if (resultSlot) {
       resultSlot.innerHTML = '';
@@ -306,6 +375,27 @@ class UIManager {
           count.className = 'count';
           count.textContent = result.count;
           resultSlot.appendChild(count);
+        }
+      }
+    }
+
+    // Update table grid slots if in table mode
+    if (this.usingTable) {
+      for (let i = 0; i < 9; i++) {
+        const item = inv.tableGrid[i];
+        const slot = document.getElementById(`craft-slot-${i}`);
+        if (!slot) continue;
+        let imgEl = slot.querySelector('img');
+        if (item && item.id !== BLOCK.AIR) {
+          const texCanvas = inv.getItemTexture(item.id);
+          if (texCanvas) {
+            if (!imgEl) { imgEl = document.createElement('img'); slot.appendChild(imgEl); }
+            imgEl.src = texCanvas.toDataURL();
+          }
+          slot.title = `${inv.getItemName(item.id)} x${item.count}`;
+        } else {
+          if (imgEl) imgEl.remove();
+          slot.title = '';
         }
       }
     }
@@ -443,15 +533,18 @@ class UIManager {
 
   _onCraftResultClick() {
     const inv = this.inventory;
-    const result = findCraftingRecipe(inv.craftingGrid, 2, 2);
+    const grid = this.usingTable ? inv.tableGrid : inv.craftingGrid;
+    const gridW = this.usingTable ? 3 : 2;
+    const gridH = this.usingTable ? 3 : 2;
+    const result = findCraftingRecipe(grid, gridW, gridH);
     if (!result) return;
 
     // Consume one from each crafting slot
-    for (let i = 0; i < 4; i++) {
-      if (inv.craftingGrid[i].id !== BLOCK.AIR) {
-        inv.craftingGrid[i].count--;
-        if (inv.craftingGrid[i].count <= 0) {
-          inv.craftingGrid[i] = { id: BLOCK.AIR, count: 0 };
+    for (let i = 0; i < grid.length; i++) {
+      if (grid[i].id !== BLOCK.AIR) {
+        grid[i].count--;
+        if (grid[i].count <= 0) {
+          grid[i] = { id: BLOCK.AIR, count: 0 };
         }
       }
     }
@@ -476,6 +569,33 @@ class UIManager {
     this.inventoryOverlay.classList.add('hidden');
     // Return crafting items to inventory
     this._returnCraftingItems();
+    // Return table items if was in table mode
+    if (this.usingTable) {
+      this.usingTable = false;
+      for (let i = 0; i < 9; i++) {
+        if (inv.tableGrid[i].id !== BLOCK.AIR) {
+          const overflow = inv.addItem(inv.tableGrid[i].id, inv.tableGrid[i].count);
+          inv.tableGrid[i] = { id: BLOCK.AIR, count: 0 };
+        }
+      }
+      // Reset grid to 2x2
+      const grid2x2 = document.getElementById('crafting-grid-2x2');
+      if (grid2x2) {
+        grid2x2.className = 'crafting-grid';
+        grid2x2.innerHTML = '';
+        for (let i = 0; i < 4; i++) {
+          const slot = document.createElement('div');
+          slot.className = 'crafting-slot';
+          slot.id = `craft-slot-${i}`;
+          slot.dataset.craftIndex = i;
+          slot.addEventListener('click', () => this._onCraftSlotClick(i));
+          slot.addEventListener('contextmenu', (e) => { e.preventDefault(); this._onCraftSlotRightClick(i); });
+          grid2x2.appendChild(slot);
+        }
+        const label = grid2x2.previousElementSibling;
+        if (label) label.textContent = 'Crafting';
+      }
+    }
     // Return cursor item to inventory
     if (inv.cursorItem && inv.cursorItem.id !== BLOCK.AIR) {
       const overflow = inv.addItem(inv.cursorItem.id, inv.cursorItem.count);

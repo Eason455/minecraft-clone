@@ -85,6 +85,11 @@ document.addEventListener('click', () => audio.init(), { once: true });
 // UI
 const uiManager = new UIManager(player, inventory, interaction);
 
+// Wire crafting table right-click
+interaction._onOpenTable = () => {
+  uiManager.openCraftingTable();
+};
+
 // Add highlight line to scene
 scene.add(interaction.getHighlightLine());
 
@@ -198,7 +203,67 @@ console.log(`Pre-generated ${chunkManager.chunks.size} spawn chunks`);
 
 let lastTime = performance.now();
 let footstepTimer = 0;
+let hungerTimer = 0;
 const MAX_MESH_PER_FRAME = 4;
+
+// Falling blocks system
+const fallingBlocks = [];
+
+function spawnFallingBlock(wx, wy, wz, blockId) {
+  // Check if already falling at this position
+  for (const fb of fallingBlocks) {
+    if (fb.wx === wx && fb.wz === wz && Math.abs(fb.y - wy) < 0.5) return;
+  }
+  fallingBlocks.push({
+    wx, wy, wz, blockId,
+    y: wy + 0.5,
+    vy: 0,
+    landed: false,
+  });
+  chunkManager.setBlock(wx, wy, wz, BLOCK.AIR);
+}
+
+function updateFallingBlocks(dt) {
+  for (let i = fallingBlocks.length - 1; i >= 0; i--) {
+    const fb = fallingBlocks[i];
+    if (fb.landed) {
+      // Place the block at the landed position
+      const ly = Math.floor(fb.y);
+      if (chunkManager.isChunkLoaded(fb.wx, fb.wz)) {
+        chunkManager.setBlock(fb.wx, ly, fb.wz, fb.blockId);
+      }
+      fallingBlocks.splice(i, 1);
+      continue;
+    }
+    fb.vy -= GRAVITY * dt;
+    fb.y += fb.vy * dt;
+    const targetY = Math.floor(fb.y);
+    const blockBelow = chunkManager.getBlock(fb.wx, targetY - 1, fb.wz);
+    if (blockBelow !== null && blockBelow !== BLOCK.AIR && blockBelow !== BLOCK.WATER) {
+      fb.y = targetY;
+      fb.landed = true;
+      fb.vy = 0;
+    }
+    if (fb.y < -10) { fallingBlocks.splice(i, 1); }
+  }
+}
+
+// Check for unsupported blocks (sand, gravel) after block changes
+function checkFallingAround(wx, wy, wz) {
+  const neighbors = [[1,0],[0,1],[-1,0],[0,-1]];
+  for (const [dx, dz] of neighbors) {
+    for (let dy = 0; dy < 3; dy++) {
+      const nx = wx + dx, ny = wy + dy, nz = wz + dz;
+      const block = chunkManager.getBlock(nx, ny, nz);
+      if (block === BLOCK.SAND || block === BLOCK.GRAVEL) {
+        const below = chunkManager.getBlock(nx, ny - 1, nz);
+        if (below === BLOCK.AIR || below === BLOCK.WATER) {
+          spawnFallingBlock(nx, ny, nz, block);
+        }
+      }
+    }
+  }
+}
 
 function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
@@ -266,7 +331,26 @@ function gameLoop(timestamp) {
   // === STEP 2: Update player AFTER chunks are loaded ===
   if (gameRunning) {
     player.update(deltaTime);
+
+    // Hunger system: decrease hunger over time
+    hungerTimer += deltaTime;
+    if (hungerTimer > 30) { // every 30 seconds
+      hungerTimer = 0;
+      if (player.hunger > 0) player.hunger--;
+      // Damage from starvation
+      if (player.hunger <= 0 && player.health > 1) {
+        player.health -= 1;
+        audio.playHurt();
+      }
+      // Heal with full hunger
+      if (player.hunger >= 18 && player.health < 20) {
+        player.health = Math.min(20, player.health + 0.5);
+      }
+    }
   }
+
+  // Update falling blocks
+  updateFallingBlocks(deltaTime);
 
   // Debug: one-time camera and scene verification on first real frame
   if (!window._debugDone && gameRunning) {

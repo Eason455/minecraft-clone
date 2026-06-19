@@ -106,7 +106,14 @@ class Player {
     }
 
     // Sprinting (Ctrl or double-tap W)
-    this.isSprinting = input.isKeyDown('ControlLeft') || input.isKeyDown('ControlRight');
+    const sprintKey = input.isKeyDown('ControlLeft') || input.isKeyDown('ControlRight');
+    // Double-tap W for sprint
+    if (input.isKeyPressed('KeyW') && this._lastWPress && Date.now() - this._lastWPress < 300) {
+      this._sprintToggle = true;
+    }
+    if (input.isKeyPressed('KeyW')) this._lastWPress = Date.now();
+    if (!input.isKeyDown('KeyW')) this._sprintToggle = false;
+    this.isSprinting = sprintKey || this._sprintToggle;
 
     // Sneaking (Shift)
     this.isSneaking = input.isKeyDown('ShiftLeft') || input.isKeyDown('ShiftRight');
@@ -134,16 +141,35 @@ class Player {
 
     // In water, jump to swim up
     if (input.isKeyDown('Space') && this.isInWater) {
-      this.velocity.y = Math.min(this.velocity.y + 0.5, 4);
+      this.velocity.y = Math.min(this.velocity.y + 0.8, 3);
+    }
+
+    // Sprint drains hunger
+    if (this.isSprinting && len > 0) {
+      this._sprintTimer = (this._sprintTimer || 0) + dt;
+      if (this._sprintTimer > 3) { // every 3 seconds of sprinting
+        this._sprintTimer = 0;
+        if (this.hunger > 0) this.hunger -= 0.1;
+      }
+      // Can't sprint if too hungry
+      if (this.hunger <= 3) this.isSprinting = false;
+    } else {
+      this._sprintTimer = 0;
     }
   }
 
   _updatePhysics(dt) {
     const prevY = this.position.y;
 
-    // Apply gravity
+    // Apply gravity (reduced in water)
     if (!this.onGround) {
-      this.velocity.y -= GRAVITY * dt;
+      const g = this.isInWater ? GRAVITY * 0.3 : GRAVITY;
+      this.velocity.y -= g * dt;
+    }
+
+    // Buoyancy in water
+    if (this.isInWater && this.velocity.y < -2) {
+      this.velocity.y *= 0.9;
     }
 
     // Terminal velocity
